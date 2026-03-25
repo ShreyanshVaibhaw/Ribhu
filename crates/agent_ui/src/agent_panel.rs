@@ -4354,10 +4354,11 @@ impl AgentPanel {
         focus_handle: &FocusHandle,
         cx: &mut App,
     ) -> impl IntoElement {
-        let zed_provider_configured = AgentSettings::get_global(cx)
-            .default_model
-            .as_ref()
-            .is_some_and(|selection| selection.provider.0.as_str() == "zed.dev");
+        let zed_provider_configured = client::cloud_features_enabled()
+            && AgentSettings::get_global(cx)
+                .default_model
+                .as_ref()
+                .is_some_and(|selection| selection.provider.0.as_str() == "zed.dev");
 
         let callout = if zed_provider_configured {
             Callout::new()

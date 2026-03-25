@@ -2,10 +2,10 @@
 AppId={#AppId}
 AppName={#AppName}
 AppVerName={#AppDisplayName}
-AppPublisher=Zed Industries
-AppPublisherURL=https://www.zed.dev/
-AppSupportURL=https://www.zed.dev/
-AppUpdatesURL=https://www.zed.dev/
+AppPublisher=Ribhu Contributors
+AppPublisherURL=https://github.com/ShreyanshVaibhaw/zed
+AppSupportURL=https://github.com/ShreyanshVaibhaw/zed
+AppUpdatesURL=https://github.com/ShreyanshVaibhaw/zed
 DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes
 DisableReadyPage=yes

@@ -257,7 +257,9 @@ impl Render for TitleBar {
                 .children(self.render_connection_status(status, cx))
                 .child(self.update_version.clone())
                 .when(
-                    user.is_none() && TitleBarSettings::get_global(cx).show_sign_in,
+                    user.is_none()
+                        && TitleBarSettings::get_global(cx).show_sign_in
+                        && client::cloud_features_enabled(),
                     |this| this.child(self.render_sign_in_button(cx)),
                 )
                 .when(TitleBarSettings::get_global(cx).show_user_menu, |this| {

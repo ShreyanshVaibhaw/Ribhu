@@ -456,6 +456,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "ai_conductor"
+version = "0.1.0"
+
+[[package]]
 name = "ai_onboarding"
 version = "0.1.0"
 dependencies = [
@@ -660,6 +664,10 @@ name = "anyhow"
 version = "1.0.100"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a23eb6b1614318a8071c9b2521f36b424b2c83db5eb3a0fead4a6c0809af6e61"
+
+[[package]]
+name = "api_client"
+version = "0.1.0"
 
 [[package]]
 name = "approx"
@@ -3536,6 +3544,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "245097e9a4535ee1e3e3931fcfcd55a796a44c643e8596ff6566d68f09b87bbc"
 
 [[package]]
+name = "context_bus"
+version = "0.1.0"
+
+[[package]]
 name = "context_server"
 version = "0.1.0"
 dependencies = [
@@ -4584,6 +4596,10 @@ name = "data-url"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "be1e0bca6c3637f992fc1cc7cbc52a78c1ef6db076dbf1059c4323d6a2048376"
+
+[[package]]
+name = "database_panel"
+version = "0.1.0"
 
 [[package]]
 name = "db"
@@ -13309,6 +13325,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "project_profiles"
+version = "0.1.0"
+
+[[package]]
 name = "project_symbols"
 version = "0.1.0"
 dependencies = [
@@ -17497,6 +17517,10 @@ dependencies = [
  "workspace",
  "zed_actions",
 ]
+
+[[package]]
+name = "test_runner"
+version = "0.1.0"
 
 [[package]]
 name = "text"

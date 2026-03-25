@@ -19,14 +19,14 @@ static CUSTOM_DATA_DIR: OnceLock<PathBuf> = OnceLock::new();
 /// This is set once and cached for subsequent calls.
 /// On macOS, this is `~/Library/Application Support/Zed`.
 /// On Linux/FreeBSD, this is `$XDG_DATA_HOME/zed`.
-/// On Windows, this is `%LOCALAPPDATA%\Zed`.
+/// On Windows, this is `%LOCALAPPDATA%\Ribhu`.
 static CURRENT_DATA_DIR: OnceLock<PathBuf> = OnceLock::new();
 
 /// The resolved config directory, combining custom override or platform defaults.
 /// This is set once and cached for subsequent calls.
 /// On macOS, this is `~/.config/zed`.
 /// On Linux/FreeBSD, this is `$XDG_CONFIG_HOME/zed`.
-/// On Windows, this is `%APPDATA%\Zed`.
+/// On Windows, this is `%APPDATA%\Ribhu`.
 static CONFIG_DIR: OnceLock<PathBuf> = OnceLock::new();
 
 /// Returns the relative path to the zed_server directory on the ssh host.
@@ -84,7 +84,7 @@ pub fn config_dir() -> &'static PathBuf {
         } else if cfg!(target_os = "windows") {
             dirs::config_dir()
                 .expect("failed to determine RoamingAppData directory")
-                .join("Zed")
+                .join("Ribhu")
         } else if cfg!(any(target_os = "linux", target_os = "freebsd")) {
             if let Ok(flatpak_xdg_config) = std::env::var("FLATPAK_XDG_CONFIG_HOME") {
                 flatpak_xdg_config.into()
@@ -115,7 +115,7 @@ pub fn data_dir() -> &'static PathBuf {
         } else if cfg!(target_os = "windows") {
             dirs::data_local_dir()
                 .expect("failed to determine LocalAppData directory")
-                .join("Zed")
+                .join("Ribhu")
         } else {
             config_dir().clone() // Fallback
         }
@@ -140,7 +140,7 @@ pub fn state_dir() -> &'static PathBuf {
             // Windows
             return dirs::data_local_dir()
                 .expect("failed to determine LocalAppData directory")
-                .join("Zed");
+                .join("Ribhu");
         }
     })
 }
@@ -152,7 +152,7 @@ pub fn temp_dir() -> &'static PathBuf {
         if cfg!(target_os = "macos") {
             return dirs::cache_dir()
                 .expect("failed to determine cachesDirectory directory")
-                .join("Zed");
+                .join("Ribhu");
         }
 
         if cfg!(target_os = "windows") {
@@ -201,13 +201,13 @@ pub fn remote_server_state_dir() -> &'static PathBuf {
 /// Returns the path to the `Zed.log` file.
 pub fn log_file() -> &'static PathBuf {
     static LOG_FILE: OnceLock<PathBuf> = OnceLock::new();
-    LOG_FILE.get_or_init(|| logs_dir().join("Zed.log"))
+    LOG_FILE.get_or_init(|| logs_dir().join("Ribhu.log"))
 }
 
 /// Returns the path to the `Zed.log.old` file.
 pub fn old_log_file() -> &'static PathBuf {
     static OLD_LOG_FILE: OnceLock<PathBuf> = OnceLock::new();
-    OLD_LOG_FILE.get_or_init(|| logs_dir().join("Zed.log.old"))
+    OLD_LOG_FILE.get_or_init(|| logs_dir().join("Ribhu.log.old"))
 }
 
 /// Returns the path to the database directory.

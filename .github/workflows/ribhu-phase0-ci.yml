@@ -1,0 +1,111 @@
+name: ribhu-phase0-ci
+
+on:
+  pull_request:
+  push:
+    branches:
+      - ribhu-main
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: "1"
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  validate:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+          - macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          clean: false
+
+      - name: Configure Git long paths
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: git config --global core.longpaths true
+
+      - name: Set up MSVC environment
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: amd64
+
+      - name: Locate Windows RC toolkit
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $rc = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Filter rc.exe -Recurse |
+            Where-Object { $_.FullName -match '\\x64\\rc\.exe$' } |
+            Sort-Object FullName -Descending |
+            Select-Object -First 1
+          if (-not $rc) {
+            throw "Unable to locate rc.exe"
+          }
+          "ZED_RC_TOOLKIT_PATH=$($rc.DirectoryName)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: ./script/linux
+
+      - name: Install macOS dependencies
+        if: runner.os == 'macOS'
+        run: brew install cmake
+
+      - name: Export macOS SDK path
+        if: runner.os == 'macOS'
+        run: echo "BINDGEN_EXTRA_CLANG_ARGS=--sysroot=$(xcrun --show-sdk-path)" >> "$GITHUB_ENV"
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Set up CI cargo config (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          mkdir -p ../.cargo
+          cp ./.cargo/ci-config.toml ../.cargo/config.toml
+
+      - name: Set up CI cargo config (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path "..\\.cargo" -Force | Out-Null
+          Copy-Item ".\\.cargo\\ci-config.toml" "..\\.cargo\\config.toml" -Force
+
+      - name: Cache Cargo artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
+      - name: cargo clippy
+        run: cargo clippy --workspace --all-targets
+
+      - name: cargo test --workspace
+        run: cargo test --workspace
+
+      - name: cargo build --release
+        run: cargo build --release
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ribhu-${{ matrix.os }}-release
+          if-no-files-found: warn
+          path: |
+            target/release/zed
+            target/release/zed.exe

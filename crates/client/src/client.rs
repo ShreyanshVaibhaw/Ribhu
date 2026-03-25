@@ -78,10 +78,19 @@ pub static ZED_APP_PATH: LazyLock<Option<PathBuf>> =
 
 pub static ZED_ALWAYS_ACTIVE: LazyLock<bool> =
     LazyLock::new(|| std::env::var("ZED_ALWAYS_ACTIVE").is_ok_and(|e| !e.is_empty()));
+static RIBHU_ENABLE_ZED_CLOUD: LazyLock<bool> = LazyLock::new(|| {
+    std::env::var("RIBHU_ENABLE_ZED_CLOUD")
+        .is_ok_and(|value| matches!(value.as_str(), "1" | "true" | "TRUE" | "yes" | "YES"))
+});
 
 pub const INITIAL_RECONNECTION_DELAY: Duration = Duration::from_millis(500);
 pub const MAX_RECONNECTION_DELAY: Duration = Duration::from_secs(30);
 pub const CONNECTION_TIMEOUT: Duration = Duration::from_secs(20);
+
+/// Ribhu Phase 0 runs without a required runtime dependency on Zed-hosted cloud services.
+pub fn cloud_features_enabled() -> bool {
+    *RIBHU_ENABLE_ZED_CLOUD
+}
 
 actions!(
     client,
@@ -516,6 +525,13 @@ pub struct TelemetrySettings {
 
 impl settings::Settings for TelemetrySettings {
     fn from_settings(content: &SettingsContent) -> Self {
+        if !cloud_features_enabled() {
+            return Self {
+                diagnostics: false,
+                metrics: false,
+            };
+        }
+
         Self {
             diagnostics: content.telemetry.as_ref().unwrap().diagnostics.unwrap(),
             metrics: content.telemetry.as_ref().unwrap().metrics.unwrap(),
@@ -965,6 +981,10 @@ impl Client {
         try_provider: bool,
         cx: &AsyncApp,
     ) -> Result<()> {
+        if !cloud_features_enabled() {
+            return Ok(());
+        }
+
         // Don't try to sign in again if we're already connected to Collab, as it will temporarily disconnect us.
         if self.status().borrow().is_connected() {
             return Ok(());

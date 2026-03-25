@@ -5556,6 +5556,8 @@ impl Workspace {
             title.push_str(" ↗");
         }
 
+        title.insert_str(0, "Ribhu — ");
+
         if let Some(last_title) = self.last_window_title.as_ref()
             && &title == last_title
         {
@@ -10462,13 +10464,13 @@ mod tests {
                     .map(|e| e.id)
             );
         });
-        assert_eq!(cx.window_title().as_deref(), Some("root1 — one.txt"));
+        assert_eq!(cx.window_title().as_deref(), Some("Ribhu — root1 — one.txt"));
 
         // Add a second item to a non-empty pane
         workspace.update_in(cx, |workspace, window, cx| {
             workspace.add_item_to_active_pane(Box::new(item2), None, true, window, cx)
         });
-        assert_eq!(cx.window_title().as_deref(), Some("root1 — two.txt"));
+        assert_eq!(cx.window_title().as_deref(), Some("Ribhu — root1 — two.txt"));
         project.update(cx, |project, cx| {
             assert_eq!(
                 project.active_entry(),
@@ -10484,7 +10486,7 @@ mod tests {
         })
         .await
         .unwrap();
-        assert_eq!(cx.window_title().as_deref(), Some("root1 — one.txt"));
+        assert_eq!(cx.window_title().as_deref(), Some("Ribhu — root1 — one.txt"));
         project.update(cx, |project, cx| {
             assert_eq!(
                 project.active_entry(),
@@ -10501,11 +10503,14 @@ mod tests {
             })
             .await
             .unwrap();
-        assert_eq!(cx.window_title().as_deref(), Some("root1, root2 — one.txt"));
+        assert_eq!(
+            cx.window_title().as_deref(),
+            Some("Ribhu — root1, root2 — one.txt")
+        );
 
         // Remove a project folder
         project.update(cx, |project, cx| project.remove_worktree(worktree_id, cx));
-        assert_eq!(cx.window_title().as_deref(), Some("root2 — one.txt"));
+        assert_eq!(cx.window_title().as_deref(), Some("Ribhu — root2 — one.txt"));
     }
 
     #[gpui::test]

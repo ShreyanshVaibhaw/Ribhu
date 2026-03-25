@@ -217,6 +217,9 @@ pub fn init(cx: &mut App) {
         });
     })
     .on_action(|_: &OpenAccountSettings, cx| {
+        if !client::cloud_features_enabled() {
+            return;
+        }
         with_active_or_new_workspace(cx, |_, _, cx| {
             cx.open_url(&zed_urls::account_url(cx));
         });
@@ -346,7 +349,7 @@ pub fn build_window_options(display_uuid: Option<Uuid>, cx: &mut App) -> WindowO
             height: px(240.0),
         }),
         tabbing_identifier: if use_system_window_tabs {
-            Some(String::from("zed"))
+            Some(String::from("ribhu"))
         } else {
             None
         },

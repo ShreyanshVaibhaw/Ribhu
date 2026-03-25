@@ -72,7 +72,7 @@ use crate::zed::{OpenRequestKind, eager_load_active_theme_and_icon_theme};
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 fn files_not_created_on_launch(errors: HashMap<io::ErrorKind, Vec<&Path>>) {
-    let message = "Zed failed to launch";
+    let message = "Ribhu failed to launch";
     let error_details = errors
         .into_iter()
         .flat_map(|(kind, paths)| {
@@ -134,7 +134,7 @@ fn fail_to_open_window_async(e: anyhow::Error, cx: &mut AsyncApp) {
 
 fn fail_to_open_window(e: anyhow::Error, _cx: &mut App) {
     eprintln!(
-        "Zed failed to open a window: {e:?}. See https://zed.dev/docs/linux for troubleshooting steps."
+        "Ribhu failed to open a window: {e:?}. See https://zed.dev/docs/linux for troubleshooting steps."
     );
     #[cfg(not(any(target_os = "linux", target_os = "freebsd")))]
     {
@@ -150,11 +150,11 @@ fn fail_to_open_window(e: anyhow::Error, _cx: &mut App) {
                 process::exit(1);
             };
 
-            let notification_id = "dev.zed.Oops";
+            let notification_id = "dev.ribhu.Oops";
             proxy
                 .add_notification(
                     notification_id,
-                    Notification::new("Zed failed to launch")
+                    Notification::new("Ribhu failed to launch")
                         .body(Some(
                             format!(
                                 "{e:?}. See https://zed.dev/docs/linux for troubleshooting steps."
@@ -571,45 +571,50 @@ fn main() {
         project::Project::init(&client, cx);
         debugger_ui::init(cx);
         debugger_tools::init(cx);
-        client::init(&client, cx);
+        let cloud_features_enabled = client::cloud_features_enabled();
+        if cloud_features_enabled {
+            client::init(&client, cx);
+        }
 
         let system_id = cx.foreground_executor().block_on(system_id).ok();
         let installation_id = cx.foreground_executor().block_on(installation_id).ok();
         let session = cx.foreground_executor().block_on(session);
 
         let telemetry = client.telemetry();
-        telemetry.start(
-            system_id.as_ref().map(|id| id.to_string()),
-            installation_id.as_ref().map(|id| id.to_string()),
-            session.id().to_owned(),
-            cx,
-        );
-        cx.subscribe(&user_store, {
-            let telemetry = telemetry.clone();
-            move |_, evt: &client::user::Event, _| match evt {
-                client::user::Event::PrivateUserInfoUpdated => {
-                    crashes::set_user_info(crashes::UserInfo {
-                        metrics_id: telemetry.metrics_id().map(|s| s.to_string()),
-                        is_staff: telemetry.is_staff(),
-                    });
+        if cloud_features_enabled {
+            telemetry.start(
+                system_id.as_ref().map(|id| id.to_string()),
+                installation_id.as_ref().map(|id| id.to_string()),
+                session.id().to_owned(),
+                cx,
+            );
+            cx.subscribe(&user_store, {
+                let telemetry = telemetry.clone();
+                move |_, evt: &client::user::Event, _| match evt {
+                    client::user::Event::PrivateUserInfoUpdated => {
+                        crashes::set_user_info(crashes::UserInfo {
+                            metrics_id: telemetry.metrics_id().map(|s| s.to_string()),
+                            is_staff: telemetry.is_staff(),
+                        });
+                    }
+                    _ => {}
                 }
-                _ => {}
-            }
-        })
-        .detach();
+            })
+            .detach();
 
-        // We should rename these in the future to `first app open`, `first app open for release channel`, and `app open`
-        if let (Some(system_id), Some(installation_id)) = (&system_id, &installation_id) {
-            match (&system_id, &installation_id) {
-                (IdType::New(_), IdType::New(_)) => {
-                    telemetry::event!("App First Opened");
-                    telemetry::event!("App First Opened For Release Channel");
-                }
-                (IdType::Existing(_), IdType::New(_)) => {
-                    telemetry::event!("App First Opened For Release Channel");
-                }
-                (_, IdType::Existing(_)) => {
-                    telemetry::event!("App Opened");
+            // We should rename these in the future to `first app open`, `first app open for release channel`, and `app open`
+            if let (Some(system_id), Some(installation_id)) = (&system_id, &installation_id) {
+                match (&system_id, &installation_id) {
+                    (IdType::New(_), IdType::New(_)) => {
+                        telemetry::event!("App First Opened");
+                        telemetry::event!("App First Opened For Release Channel");
+                    }
+                    (IdType::Existing(_), IdType::New(_)) => {
+                        telemetry::event!("App First Opened For Release Channel");
+                    }
+                    (_, IdType::Existing(_)) => {
+                        telemetry::event!("App Opened");
+                    }
                 }
             }
         }
@@ -627,10 +632,12 @@ fn main() {
         });
         AppState::set_global(Arc::downgrade(&app_state), cx);
 
-        auto_update::init(client.clone(), cx);
         dap_adapters::init(cx);
-        auto_update_ui::init(cx);
-        reliability::init(client.clone(), cx);
+        if cloud_features_enabled {
+            auto_update::init(client.clone(), cx);
+            auto_update_ui::init(cx);
+            reliability::init(client.clone(), cx);
+        }
         extension_host::init(
             extension_host_proxy.clone(),
             app_state.fs.clone(),
@@ -796,17 +803,19 @@ fn main() {
             }
         })
         .detach();
-        telemetry::event!(
-            "Settings Changed",
-            setting = "theme",
-            value = cx.theme().name.to_string()
-        );
-        telemetry::event!(
-            "Settings Changed",
-            setting = "keymap",
-            value = BaseKeymap::get_global(cx).to_string()
-        );
-        telemetry.flush_events().detach();
+        if cloud_features_enabled {
+            telemetry::event!(
+                "Settings Changed",
+                setting = "theme",
+                value = cx.theme().name.to_string()
+            );
+            telemetry::event!(
+                "Settings Changed",
+                setting = "keymap",
+                value = BaseKeymap::get_global(cx).to_string()
+            );
+            telemetry.flush_events().detach();
+        }
 
         let fs = app_state.fs.clone();
         load_user_themes_in_background(fs.clone(), cx);
@@ -819,11 +828,13 @@ fn main() {
 
         cx.activate(true);
 
-        cx.spawn({
-            let client = app_state.client.clone();
-            async move |cx| authenticate(client, cx).await
-        })
-        .detach_and_log_err(cx);
+        if cloud_features_enabled {
+            cx.spawn({
+                let client = app_state.client.clone();
+                async move |cx| authenticate(client, cx).await
+            })
+            .detach_and_log_err(cx);
+        }
 
         let urls: Vec<_> = args
             .paths_or_urls
@@ -1290,6 +1301,10 @@ fn handle_open_request(request: OpenRequest, app_state: Arc<AppState>, cx: &mut 
 }
 
 async fn authenticate(client: Arc<Client>, cx: &AsyncApp) -> Result<()> {
+    if !client::cloud_features_enabled() {
+        return Ok(());
+    }
+
     if stdout_is_a_pty() {
         if client::IMPERSONATE_LOGIN.is_some() {
             client.sign_in_with_optional_connect(false, cx).await?;
@@ -1454,7 +1469,34 @@ pub(crate) async fn restore_or_create_workspace(
             }
         }
     } else if matches!(kvp.read_kvp(FIRST_OPEN), Ok(None)) {
-        cx.update(|cx| show_onboarding_view(app_state, cx)).await?;
+        if client::cloud_features_enabled() {
+            cx.update(|cx| show_onboarding_view(app_state.clone(), cx))
+                .await?;
+        } else {
+            cx.update(|cx| {
+                let kvp = GlobalKeyValueStore::global();
+                db::write_and_log(cx, move || async move {
+                    kvp.write_kvp(FIRST_OPEN.to_string(), "false".to_string())
+                        .await
+                });
+                workspace::open_new(
+                    Default::default(),
+                    app_state,
+                    cx,
+                    |workspace, window, cx| {
+                        let restore_on_startup =
+                            WorkspaceSettings::get_global(cx).restore_on_startup;
+                        match restore_on_startup {
+                            workspace::RestoreOnStartupBehavior::Launchpad => {}
+                            _ => {
+                                Editor::new_file(workspace, &Default::default(), window, cx);
+                            }
+                        }
+                    },
+                )
+            })
+            .await?;
+        }
     } else {
         cx.update(|cx| {
             workspace::open_new(
