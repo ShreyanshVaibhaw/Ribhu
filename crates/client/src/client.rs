@@ -525,13 +525,6 @@ pub struct TelemetrySettings {
 
 impl settings::Settings for TelemetrySettings {
     fn from_settings(content: &SettingsContent) -> Self {
-        if !cloud_features_enabled() {
-            return Self {
-                diagnostics: false,
-                metrics: false,
-            };
-        }
-
         Self {
             diagnostics: content.telemetry.as_ref().unwrap().diagnostics.unwrap(),
             metrics: content.telemetry.as_ref().unwrap().metrics.unwrap(),
