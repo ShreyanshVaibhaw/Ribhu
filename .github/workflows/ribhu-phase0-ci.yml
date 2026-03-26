@@ -65,6 +65,11 @@ jobs:
       - name: workspace tests
         run: cargo nextest run --workspace --no-fail-fast
 
+      - name: Free macOS disk before release build
+        run: |
+          rm -rf target/debug target/.nextest
+          df -h
+
       - name: cargo build --release
         run: cargo build --release
 

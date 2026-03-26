@@ -2398,34 +2398,40 @@ fn find_surrounding_code_block(snapshot: &BufferSnapshot, offset: usize) -> Opti
     let layer = snapshot.syntax_layers().next()?;
 
     let root_node = layer.node();
-    let mut cursor = root_node.walk();
+    let root_end = root_node.end_byte();
+    for candidate_start in [offset, offset.saturating_add(1)] {
+        let candidate_start = candidate_start.min(root_end);
+        let candidate_end = if candidate_start < root_end {
+            candidate_start + 1
+        } else {
+            candidate_start
+        };
 
-    // Go to the first child for the given offset
-    while cursor.goto_first_child_for_byte(offset).is_some() {
-        // If we're at the end of the node, go to the next one.
-        // Example: if you have a fenced-code-block, and you're on the start of the line
-        // right after the closing ```, you want to skip the fenced-code-block and
-        // go to the next sibling.
-        if cursor.node().end_byte() == offset {
-            cursor.goto_next_sibling();
-        }
+        let Some(mut node) = root_node.descendant_for_byte_range(candidate_start, candidate_end)
+        else {
+            continue;
+        };
 
-        if cursor.node().start_byte() > offset {
-            break;
-        }
-
-        // We found the fenced code block.
-        if cursor.node().kind() == CODE_BLOCK_NODE {
-            // Now we need to find the child node that contains the code.
-            cursor.goto_first_child();
-            loop {
-                if cursor.node().kind() == CODE_BLOCK_CONTENT {
-                    return Some(cursor.node().byte_range());
+        loop {
+            if node.kind() == CODE_BLOCK_NODE {
+                let mut cursor = node.walk();
+                if cursor.goto_first_child() {
+                    loop {
+                        if cursor.node().kind() == CODE_BLOCK_CONTENT {
+                            return Some(cursor.node().byte_range());
+                        }
+                        if !cursor.goto_next_sibling() {
+                            break;
+                        }
+                    }
                 }
-                if !cursor.goto_next_sibling() {
-                    break;
-                }
+                break;
             }
+
+            let Some(parent) = node.parent() else {
+                break;
+            };
+            node = parent;
         }
     }
 

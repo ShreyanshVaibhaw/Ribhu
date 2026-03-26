@@ -2704,10 +2704,18 @@ mod tests {
             completion_rx.recv().await.unwrap(),
             Some(ExitStatus::default())
         );
-        assert_eq!(
-            terminal.update(cx, |term, _| term.get_content()).trim(),
-            "hello"
-        );
+        let mut content = String::new();
+        for _ in 0..20 {
+            cx.run_until_parked();
+            content = terminal.update(cx, |term, _| term.get_content());
+            if content.trim() == "hello" {
+                break;
+            }
+            cx.background_executor
+                .timer(Duration::from_millis(50))
+                .await;
+        }
+        assert_eq!(content.trim(), "hello");
 
         // Inject additional output directly into the emulator (display-only path)
         terminal.update(cx, |term, cx| {
