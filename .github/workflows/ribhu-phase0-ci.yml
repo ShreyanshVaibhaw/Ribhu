@@ -65,9 +65,9 @@ jobs:
       - name: workspace tests
         run: cargo nextest run --workspace --no-fail-fast
 
-      - name: Free macOS disk before release build
+      - name: Free disk before release build
         run: |
-          rm -rf target/debug target/.nextest
+          rm -rf target/debug target/.nextest target/tmp
           df -h
 
       - name: cargo build --release
@@ -122,6 +122,13 @@ jobs:
 
       - name: workspace tests
         run: cargo nextest run --workspace --no-fail-fast
+
+      - name: Free macOS disk before release build
+        run: |
+          rm -rf target/debug target/.nextest target/tmp
+          rm -rf "$HOME/.cargo/registry/cache"
+          rm -rf "$HOME/Library/Caches/Homebrew" || true
+          df -h
 
       - name: cargo build --release
         run: cargo build --release
