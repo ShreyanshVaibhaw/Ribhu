@@ -2394,11 +2394,13 @@ impl TextThreadEditor {
 fn find_surrounding_code_block(snapshot: &BufferSnapshot, offset: usize) -> Option<Range<usize>> {
     const CODE_BLOCK_NODE: &str = "fenced_code_block";
     const CODE_BLOCK_CONTENT: &str = "code_fence_content";
+    const CODE_BLOCK_DELIMITER: &str = "fenced_code_block_delimiter";
 
     let layer = snapshot.syntax_layers().next()?;
-
     let root_node = layer.node();
     let root_end = root_node.end_byte();
+    let row = snapshot.offset_to_point(offset).row as usize;
+
     for candidate_start in [offset, offset.saturating_add(1)] {
         let candidate_start = candidate_start.min(root_end);
         let candidate_end = if candidate_start < root_end {
@@ -2414,15 +2416,36 @@ fn find_surrounding_code_block(snapshot: &BufferSnapshot, offset: usize) -> Opti
 
         loop {
             if node.kind() == CODE_BLOCK_NODE {
+                let mut content_range = None;
+                let mut opening_fence_row = None;
+                let mut closing_fence_row = None;
                 let mut cursor = node.walk();
                 if cursor.goto_first_child() {
                     loop {
-                        if cursor.node().kind() == CODE_BLOCK_CONTENT {
-                            return Some(cursor.node().byte_range());
+                        match cursor.node().kind() {
+                            CODE_BLOCK_CONTENT => {
+                                content_range = Some(cursor.node().byte_range());
+                            }
+                            CODE_BLOCK_DELIMITER => {
+                                let delimiter_row = cursor.node().start_position().row;
+                                if opening_fence_row.is_none() {
+                                    opening_fence_row = Some(delimiter_row);
+                                }
+                                closing_fence_row = Some(delimiter_row);
+                            }
+                            _ => {}
                         }
                         if !cursor.goto_next_sibling() {
                             break;
                         }
+                    }
+                }
+                if let Some(content_range) = content_range {
+                    let opening_fence_row =
+                        opening_fence_row.unwrap_or_else(|| node.start_position().row);
+                    let closing_fence_row = closing_fence_row.unwrap_or(opening_fence_row);
+                    if (opening_fence_row..=closing_fence_row).contains(&row) {
+                        return Some(content_range);
                     }
                 }
                 break;
