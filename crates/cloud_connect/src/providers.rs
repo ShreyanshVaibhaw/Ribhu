@@ -26,6 +26,14 @@ impl InstanceStatus {
             Self::Unknown => "Unknown",
         }
     }
+
+    pub fn is_running(self) -> bool {
+        matches!(self, Self::Running)
+    }
+
+    pub fn is_connectable(self) -> bool {
+        matches!(self, Self::Running | Self::Unknown)
+    }
 }
 
 /// GPU information for a cloud instance.
