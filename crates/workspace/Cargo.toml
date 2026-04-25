@@ -26,6 +26,7 @@ test-support = [
 ]
 
 [dependencies]
+ai_conductor.workspace = true
 any_vec.workspace = true
 anyhow.workspace = true
 async-recursion.workspace = true
@@ -34,6 +35,7 @@ chrono.workspace = true
 clock.workspace = true
 collections.workspace = true
 component.workspace = true
+context_bus.workspace = true
 db.workspace = true
 feature_flags.workspace = true
 fs.workspace = true

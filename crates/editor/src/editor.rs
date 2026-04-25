@@ -154,6 +154,7 @@ use multi_buffer::{
 };
 use parking_lot::Mutex;
 use persistence::EditorDb;
+use context_bus::{ContextEvent, ContextSource};
 use project::{
     BreakpointWithPosition, CodeAction, Completion, CompletionDisplayOptions, CompletionIntent,
     CompletionResponse, CompletionSource, DisableAiSettings, DocumentHighlight, InlayHint, InlayId,
@@ -3267,6 +3268,27 @@ impl Editor {
             .and_then(|workspace| workspace.1)
     }
 
+    fn context_bus_file_path(&self, cx: &App) -> Option<String> {
+        self.buffer().read(cx).as_singleton().and_then(|buffer| {
+            project::File::from_dyn(buffer.read(cx).file()).map(|file| {
+                file.abs_path(cx)
+                    .as_os_str()
+                    .to_string_lossy()
+                    .into_owned()
+            })
+        })
+    }
+
+    fn publish_context_event(&self, event: ContextEvent, cx: &mut App) {
+        let Some(workspace) = self.workspace() else {
+            return;
+        };
+
+        let _ = workspace.update(cx, |workspace, cx| {
+            workspace.publish_context_event(ContextSource::Editor, event, cx);
+        });
+    }
+
     pub fn title<'a>(&self, cx: &'a App) -> Cow<'a, str> {
         self.buffer().read(cx).title(cx)
     }
@@ -3768,10 +3790,20 @@ impl Editor {
         self.blink_manager.update(cx, BlinkManager::pause_blinking);
 
         if local && !self.suppress_selection_callback {
+            let cursor_position = self.selections.newest::<Point>(&display_map).head();
             if let Some(callback) = self.on_local_selections_changed.as_ref() {
-                let cursor_position = self.selections.newest::<Point>(&display_map).head();
                 callback(cursor_position, window, cx);
             }
+
+            self.publish_context_event(
+                ContextEvent::CursorMoved {
+                    path: self.context_bus_file_path(cx),
+                    row: cursor_position.row,
+                    column: cursor_position.column,
+                    symbol_name: None,
+                },
+                cx,
+            );
         }
 
         cx.emit(EditorEvent::SelectionsChanged { local });
@@ -24372,7 +24404,18 @@ impl Editor {
                 cx.notify();
             }
             multi_buffer::Event::DirtyChanged => cx.emit(EditorEvent::DirtyChanged),
-            multi_buffer::Event::Saved => cx.emit(EditorEvent::Saved),
+            multi_buffer::Event::Saved => {
+                cx.emit(EditorEvent::Saved);
+                self.publish_context_event(
+                    ContextEvent::FileSaved {
+                        path: self.context_bus_file_path(cx),
+                        language: None,
+                        lines_changed: None,
+                        diagnostics_count: None,
+                    },
+                    cx,
+                );
+            }
             multi_buffer::Event::FileHandleChanged
             | multi_buffer::Event::Reloaded
             | multi_buffer::Event::BufferDiffChanged => cx.emit(EditorEvent::TitleChanged),

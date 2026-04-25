@@ -346,6 +346,7 @@ dependencies = [
  "collections",
  "command_palette_hooks",
  "component",
+ "context_bus",
  "context_server",
  "db",
  "editor",
@@ -458,6 +459,16 @@ dependencies = [
 [[package]]
 name = "ai_conductor"
 version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "context_bus",
+ "gpui",
+ "log",
+ "regex",
+ "serde",
+ "serde_json",
+ "uuid",
+]
 
 [[package]]
 name = "ai_onboarding"
@@ -668,6 +679,27 @@ checksum = "a23eb6b1614318a8071c9b2521f36b424b2c83db5eb3a0fead4a6c0809af6e61"
 [[package]]
 name = "api_client"
 version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "context_bus",
+ "log",
+ "serde",
+]
+
+[[package]]
+name = "api_client_panel"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "api_client",
+ "context_bus",
+ "gpui",
+ "log",
+ "panel",
+ "ui",
+ "util",
+ "workspace",
+]
 
 [[package]]
 name = "approx"
@@ -3062,6 +3094,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "cloud_connect"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "context_bus",
+ "gpui",
+ "http_client",
+ "log",
+ "panel",
+ "serde",
+ "serde_json",
+ "ui",
+ "util",
+ "workspace",
+]
+
+[[package]]
 name = "cloud_llm_client"
 version = "0.1.0"
 dependencies = [
@@ -3546,6 +3595,12 @@ checksum = "245097e9a4535ee1e3e3931fcfcd55a796a44c643e8596ff6566d68f09b87bbc"
 [[package]]
 name = "context_bus"
 version = "0.1.0"
+dependencies = [
+ "gpui",
+ "log",
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "context_server"
@@ -4600,6 +4655,15 @@ checksum = "be1e0bca6c3637f992fc1cc7cbc52a78c1ef6db076dbf1059c4323d6a2048376"
 [[package]]
 name = "database_panel"
 version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "context_bus",
+ "gpui",
+ "log",
+ "panel",
+ "ui",
+ "workspace",
+]
 
 [[package]]
 name = "db"
@@ -5432,6 +5496,7 @@ dependencies = [
  "client",
  "clock",
  "collections",
+ "context_bus",
  "convert_case 0.8.0",
  "criterion",
  "ctor",
@@ -7356,6 +7421,7 @@ dependencies = [
  "call",
  "collections",
  "component",
+ "context_bus",
  "ctor",
  "db",
  "editor",
@@ -13327,6 +13393,25 @@ dependencies = [
 [[package]]
 name = "project_profiles"
 version = "0.1.0"
+dependencies = [
+ "ai_conductor",
+ "anyhow",
+ "context_bus",
+ "db",
+ "fuzzy",
+ "gpui",
+ "log",
+ "picker",
+ "serde",
+ "serde_json",
+ "settings",
+ "smol",
+ "ui",
+ "util",
+ "uuid",
+ "workspace",
+ "zed_actions",
+]
 
 [[package]]
 name = "project_symbols"
@@ -14582,6 +14667,21 @@ dependencies = [
  "serde",
  "tokio",
  "zed-reqwest",
+]
+
+[[package]]
+name = "resource_monitor"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "context_bus",
+ "gpui",
+ "log",
+ "panel",
+ "regex",
+ "serde",
+ "ui",
+ "workspace",
 ]
 
 [[package]]
@@ -17492,6 +17592,7 @@ dependencies = [
  "async-recursion",
  "breadcrumbs",
  "collections",
+ "context_bus",
  "db",
  "dirs 4.0.0",
  "editor",
@@ -17521,6 +17622,30 @@ dependencies = [
 [[package]]
 name = "test_runner"
 version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "context_bus",
+ "log",
+ "regex",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "test_runner_panel"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "context_bus",
+ "gpui",
+ "log",
+ "panel",
+ "test_runner",
+ "ui",
+ "util",
+ "workspace",
+]
 
 [[package]]
 name = "text"
@@ -21498,6 +21623,7 @@ dependencies = [
 name = "workspace"
 version = "0.1.0"
 dependencies = [
+ "ai_conductor",
  "any_vec",
  "anyhow",
  "async-recursion",
@@ -21506,6 +21632,7 @@ dependencies = [
  "clock",
  "collections",
  "component",
+ "context_bus",
  "db",
  "feature_flags",
  "fs",
@@ -21968,6 +22095,7 @@ dependencies = [
  "agent_settings",
  "agent_ui",
  "anyhow",
+ "api_client_panel",
  "ashpd",
  "askpass",
  "assets",
@@ -21982,6 +22110,7 @@ dependencies = [
  "cli",
  "client",
  "clock",
+ "cloud_connect",
  "codestral",
  "collab_ui",
  "collections",
@@ -21994,6 +22123,7 @@ dependencies = [
  "crashes",
  "csv_preview",
  "dap_adapters",
+ "database_panel",
  "db",
  "debug_adapter_extension",
  "debugger_tools",
@@ -22070,6 +22200,7 @@ dependencies = [
  "remote",
  "repl",
  "reqwest_client",
+ "resource_monitor",
  "rope",
  "search",
  "semver",
@@ -22094,6 +22225,7 @@ dependencies = [
  "telemetry_events",
  "tempfile",
  "terminal_view",
+ "test_runner_panel",
  "theme",
  "theme_extension",
  "theme_selector",

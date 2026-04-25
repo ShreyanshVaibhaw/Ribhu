@@ -1,4 +1,5 @@
 use anyhow::Context as _;
+use context_bus::{ContextEvent, ContextSource};
 use editor::Editor;
 use fuzzy::StringMatchCandidate;
 
@@ -802,9 +803,23 @@ impl PickerDelegate for BranchListDelegate {
                 };
 
                 let branch = branch.clone();
+                let branch_name = branch.name().to_string();
+                let workspace = self.workspace.clone();
                 cx.spawn(async move |_, cx| {
                     repo.update(cx, |repo, _| repo.change_branch(branch.name().to_string()))
                         .await??;
+
+                    if let Some(workspace) = workspace.upgrade() {
+                        let _ = workspace.update(cx, |workspace, cx| {
+                            workspace.publish_context_event(
+                                ContextSource::Git,
+                                ContextEvent::BranchChanged {
+                                    branch: branch_name.clone(),
+                                },
+                                cx,
+                            );
+                        });
+                    }
 
                     anyhow::Ok(())
                 })

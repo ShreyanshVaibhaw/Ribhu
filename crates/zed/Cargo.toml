@@ -1,12 +1,12 @@
 [package]
-description = "The fast, collaborative code editor."
+description = "The AI-orchestrated developer workspace."
 edition.workspace = true
 name = "zed"
 version = "0.230.0"
 publish.workspace = true
 license = "GPL-3.0-or-later"
 authors = ["Ribhu Contributors"]
-default-run = "zed"
+default-run = "ribhu"
 
 [lints]
 workspace = true
@@ -54,7 +54,7 @@ visual-tests = [
 ]
 
 [[bin]]
-name = "zed"
+name = "ribhu"
 path = "src/main.rs"
 
 [[bin]]
@@ -192,7 +192,12 @@ svg_preview.workspace = true
 sysinfo.workspace = true
 tab_switcher.workspace = true
 task.workspace = true
+api_client_panel.workspace = true
+cloud_connect.workspace = true
+database_panel.workspace = true
+resource_monitor.workspace = true
 tasks_ui.workspace = true
+test_runner_panel.workspace = true
 telemetry.workspace = true
 telemetry_events.workspace = true
 terminal_view.workspace = true
@@ -267,7 +272,7 @@ identifier = "dev.ribhu.Ribhu-Dev"
 name = "Ribhu Dev"
 osx_minimum_system_version = "10.15.7"
 osx_info_plist_exts = ["resources/info/*"]
-osx_url_schemes = ["zed"]
+osx_url_schemes = ["ribhu"]
 
 [package.metadata.bundle-nightly]
 icon = ["resources/app-icon-nightly@2x.png", "resources/app-icon-nightly.png"]
@@ -275,7 +280,7 @@ identifier = "dev.ribhu.Ribhu-Nightly"
 name = "Ribhu Nightly"
 osx_minimum_system_version = "10.15.7"
 osx_info_plist_exts = ["resources/info/*"]
-osx_url_schemes = ["zed"]
+osx_url_schemes = ["ribhu"]
 
 [package.metadata.bundle-preview]
 icon = ["resources/app-icon-preview@2x.png", "resources/app-icon-preview.png"]
@@ -283,7 +288,7 @@ identifier = "dev.ribhu.Ribhu-Preview"
 name = "Ribhu Preview"
 osx_minimum_system_version = "10.15.7"
 osx_info_plist_exts = ["resources/info/*"]
-osx_url_schemes = ["zed"]
+osx_url_schemes = ["ribhu"]
 
 [package.metadata.bundle-stable]
 icon = ["resources/app-icon@2x.png", "resources/app-icon.png"]
@@ -291,7 +296,7 @@ identifier = "dev.ribhu.Ribhu"
 name = "Ribhu"
 osx_minimum_system_version = "10.15.7"
 osx_info_plist_exts = ["resources/info/*"]
-osx_url_schemes = ["zed"]
+osx_url_schemes = ["ribhu"]
 
 [package.metadata.cargo-machete]
 ignored = ["profiling", "zstd", "tracing"]

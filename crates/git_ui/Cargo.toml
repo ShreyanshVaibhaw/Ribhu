@@ -23,6 +23,7 @@ buffer_diff.workspace = true
 call.workspace = true
 collections.workspace = true
 component.workspace = true
+context_bus.workspace = true
 db.workspace = true
 editor.workspace = true
 file_icons.workspace = true

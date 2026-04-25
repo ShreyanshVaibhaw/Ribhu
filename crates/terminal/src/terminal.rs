@@ -140,6 +140,13 @@ pub enum Event {
     SelectionsChanged,
     NewNavigationTarget(Option<MaybeNavigationTarget>),
     Open(MaybeNavigationTarget),
+    TaskFinished {
+        task_label: String,
+        command: String,
+        summary: String,
+        exit_code: Option<i32>,
+        success: bool,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -2263,7 +2270,15 @@ impl Terminal {
             }
         };
 
+        let exit_code = exit_status.as_ref().and_then(|status| status.code());
         let (finished_successfully, task_line, command_line) = task_summary(task, exit_status);
+        cx.emit(Event::TaskFinished {
+            task_label: task.spawned_task.full_label.clone(),
+            command: task.spawned_task.command_label.clone(),
+            summary: task_line.clone(),
+            exit_code,
+            success: finished_successfully,
+        });
         let mut lines_to_show = Vec::new();
         if task.spawned_task.show_summary {
             lines_to_show.push(task_line.as_str());

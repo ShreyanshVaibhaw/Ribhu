@@ -1,0 +1,22 @@
+[package]
+name = "api_client_panel"
+version = "0.1.0"
+edition.workspace = true
+publish.workspace = true
+
+[lib]
+path = "src/api_client_panel.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+anyhow.workspace = true
+api_client.workspace = true
+context_bus.workspace = true
+gpui.workspace = true
+log.workspace = true
+panel.workspace = true
+ui.workspace = true
+util.workspace = true
+workspace.workspace = true

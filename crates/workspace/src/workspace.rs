@@ -39,7 +39,9 @@ use client::{
     ChannelId, Client, ErrorExt, ParticipantIndex, Status, TypedEnvelope, User, UserStore,
     proto::{self, ErrorCode, PanelId, PeerId},
 };
+use ai_conductor::AiConductor;
 use collections::{HashMap, HashSet, hash_map};
+use context_bus::{ContextBus, ContextEvent, ContextEventEnvelope, ContextSource};
 use dock::{Dock, DockPosition, PanelButtons, PanelHandle, RESIZE_HANDLE_SIZE};
 use fs::Fs;
 use futures::{
@@ -78,7 +80,7 @@ pub use pane_group::{
 };
 use persistence::{SerializedWindowBounds, model::SerializedWorkspace};
 pub use persistence::{
-    WorkspaceDb, delete_unloaded_items,
+    RibhuProjectInfo, WorkspaceDb, delete_unloaded_items,
     model::{
         DockStructure, ItemId, SerializedMultiWorkspace, SerializedWorkspaceLocation,
         SessionWorkspace,
@@ -1318,6 +1320,9 @@ pub struct Workspace {
     active_call: Option<(GlobalAnyActiveCall, Vec<Subscription>)>,
     leader_updates_tx: mpsc::UnboundedSender<(PeerId, proto::UpdateFollowers)>,
     database_id: Option<WorkspaceId>,
+    context_bus: Entity<ContextBus>,
+    /// Ribhu AI Conductor — proactive AI brain for the workspace.
+    pub ai_conductor: Entity<AiConductor>,
     app_state: Arc<AppState>,
     dispatching_keystrokes: Rc<RefCell<DispatchingKeystrokes>>,
     _subscriptions: Vec<Subscription>,
@@ -1651,8 +1656,25 @@ impl Workspace {
         let _items_serializer = cx.spawn_in(window, async move |this, cx| {
             Self::serialize_items(&this, serializable_items_rx, cx).await
         });
+        let context_bus = cx.new(|_| ContextBus::default());
+
+        // Derive project root from the first visible worktree (fallback to cwd).
+        let project_root = project
+            .read(cx)
+            .visible_worktrees(cx)
+            .next()
+            .map(|wt| wt.read(cx).abs_path().to_path_buf())
+            .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
+        let ai_conductor = AiConductor::create(context_bus.clone(), project_root, cx);
 
         let subscriptions = vec![
+            cx.subscribe(&context_bus, |_, _, event: &ContextEventEnvelope, _| {
+                log::debug!(
+                    target: "ribhu::context_bus",
+                    "workspace event: {}",
+                    event.summary()
+                );
+            }),
             cx.observe_window_activation(window, Self::on_window_activation_changed),
             cx.observe_window_bounds(window, move |this, window, cx| {
                 if this.bounds_save_task_queued.is_some() {
@@ -1728,6 +1750,8 @@ impl Workspace {
             dirty_items: Default::default(),
             active_call,
             database_id: workspace_id,
+            context_bus,
+            ai_conductor,
             app_state,
             _observe_current_user,
             _apply_leader_updates,
@@ -6209,6 +6233,29 @@ impl Workspace {
 
     pub fn database_id(&self) -> Option<WorkspaceId> {
         self.database_id
+    }
+
+    pub fn context_bus(&self) -> Entity<ContextBus> {
+        self.context_bus.clone()
+    }
+
+    pub fn latest_context_event_summary(&self, cx: &App) -> Option<String> {
+        self.context_bus.read(cx).latest().map(|event| event.summary())
+    }
+
+    pub fn replay_context_events(&self, cx: &App) -> Vec<ContextEventEnvelope> {
+        self.context_bus.read(cx).replay()
+    }
+
+    pub fn publish_context_event(
+        &self,
+        source: ContextSource,
+        event: ContextEvent,
+        cx: &mut App,
+    ) -> Option<ContextEventEnvelope> {
+        let workspace_id = self.database_id.map(i64::from);
+        self.context_bus
+            .update(cx, |context_bus, cx| context_bus.publish(source, workspace_id, event, cx))
     }
 
     #[cfg(any(test, feature = "test-support"))]

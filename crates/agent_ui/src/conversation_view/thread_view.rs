@@ -3,6 +3,7 @@ use std::cell::RefCell;
 
 use acp_thread::ContentBlock;
 use cloud_api_types::{SubmitAgentThreadFeedbackBody, SubmitAgentThreadFeedbackCommentsBody};
+use context_bus::{AiSurfaceKind, ContextBus, ContextEvent, ContextEventEnvelope, ContextSource};
 use editor::actions::OpenExcerpts;
 
 use crate::StartThreadIn;
@@ -264,6 +265,7 @@ pub struct ThreadView {
     pub discarded_partial_edits: HashSet<agent_client_protocol::ToolCallId>,
     pub is_loading_contents: bool,
     pub new_server_version_available: Option<SharedString>,
+    pub last_context_event: Option<SharedString>,
     pub resumed_without_history: bool,
     pub(crate) permission_selections:
         HashMap<agent_client_protocol::ToolCallId, PermissionSelection>,
@@ -423,6 +425,11 @@ impl ThreadView {
             Self::handle_entry_view_event,
         ));
 
+        if let Some(workspace_entity) = workspace.upgrade() {
+            let context_bus = workspace_entity.read(cx).context_bus();
+            subscriptions.push(cx.subscribe(&context_bus, Self::handle_context_bus_event));
+        }
+
         subscriptions.push(cx.subscribe_in(
             &message_editor,
             window,
@@ -457,6 +464,10 @@ impl ThreadView {
             .as_ref()
             .map(|h| h.read(cx).get_recent_sessions(3))
             .unwrap_or_default();
+        let last_context_event = workspace
+            .upgrade()
+            .and_then(|workspace| workspace.read(cx).latest_context_event_summary(cx))
+            .map(SharedString::from);
 
         let mut this = Self {
             id,
@@ -505,6 +516,7 @@ impl ThreadView {
             discarded_partial_edits: HashSet::default(),
             is_loading_contents: false,
             new_server_version_available: None,
+            last_context_event,
             permission_selections: HashMap::default(),
             resume_thread_metadata: None,
             _cancel_task: None,
@@ -682,11 +694,23 @@ impl ThreadView {
                 if AgentSettings::get_global(cx).expand_edit_card {
                     self.expanded_tool_calls.insert(tool_call_id.clone());
                 }
+                self.publish_context_event(
+                    ContextEvent::AiToolSurfaced {
+                        kind: AiSurfaceKind::Diff,
+                    },
+                    cx,
+                );
             }
             ViewEvent::NewTerminal(tool_call_id) => {
                 if AgentSettings::get_global(cx).expand_terminal_card {
                     self.expanded_tool_calls.insert(tool_call_id.clone());
                 }
+                self.publish_context_event(
+                    ContextEvent::AiToolSurfaced {
+                        kind: AiSurfaceKind::Terminal,
+                    },
+                    cx,
+                );
             }
             ViewEvent::TerminalMovedToBackground(tool_call_id) => {
                 self.expanded_tool_calls.remove(tool_call_id);
@@ -731,6 +755,30 @@ impl ThreadView {
                 self.open_diff_location(path, *position, *split, window, cx);
             }
         }
+    }
+
+    fn handle_context_bus_event(
+        &mut self,
+        _: Entity<ContextBus>,
+        event: &ContextEventEnvelope,
+        cx: &mut Context<Self>,
+    ) {
+        if matches!(event.event, ContextEvent::CursorMoved { .. }) {
+            return;
+        }
+
+        self.last_context_event = Some(event.summary().into());
+        cx.notify();
+    }
+
+    fn publish_context_event(&self, event: ContextEvent, cx: &mut App) {
+        let Some(workspace) = self.workspace.upgrade() else {
+            return;
+        };
+
+        let _ = workspace.update(cx, |workspace, cx| {
+            workspace.publish_context_event(ContextSource::AgentUi, event, cx);
+        });
     }
 
     fn open_diff_location(
@@ -2111,8 +2159,10 @@ impl ThreadView {
         let changed_buffers = action_log.read(cx).changed_buffers(cx);
         let plan = thread.plan();
         let queue_is_empty = !self.has_queued_messages();
+        let workspace_event = self.last_context_event.clone();
+        let has_workspace_event = workspace_event.is_some();
 
-        if changed_buffers.is_empty() && plan.is_empty() && queue_is_empty {
+        if changed_buffers.is_empty() && plan.is_empty() && queue_is_empty && !has_workspace_event {
             return None;
         }
 
@@ -2140,6 +2190,31 @@ impl ThreadView {
                 blur_radius: px(2.),
                 spread_radius: px(0.),
             }])
+            .when_some(workspace_event, |this, workspace_event| {
+                this.child(
+                    h_flex()
+                        .px_2()
+                        .py_1()
+                        .gap_1()
+                        .items_center()
+                        .child(
+                            Icon::new(IconName::Info)
+                                .size(IconSize::Small)
+                                .color(Color::Muted),
+                        )
+                        .child(
+                            div().flex_1().child(
+                                Label::new(workspace_event)
+                                    .size(LabelSize::XSmall)
+                                    .color(Color::Muted),
+                            ),
+                        ),
+                )
+            })
+            .when(
+                has_workspace_event && (!plan.is_empty() || !changed_buffers.is_empty() || !queue_is_empty),
+                |this| this.child(Divider::horizontal().color(DividerColor::Border)),
+            )
             .when(!plan.is_empty(), |this| {
                 this.child(self.render_plan_summary(plan, window, cx))
                     .when(plan_expanded, |parent| {

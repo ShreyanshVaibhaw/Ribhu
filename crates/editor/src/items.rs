@@ -9,6 +9,7 @@ use crate::{
 };
 use anyhow::{Context as _, Result, anyhow};
 use collections::{HashMap, HashSet};
+use context_bus::{ContextEvent, ContextSource};
 use file_icons::FileIcons;
 use fs::MTime;
 use futures::future::try_join_all;
@@ -994,6 +995,20 @@ impl Item for Editor {
         cx: &mut Context<Self>,
     ) {
         self.workspace = Some((workspace.weak_handle(), workspace.database_id()));
+        let file_path = self.buffer().read(cx).as_singleton().and_then(|buffer| {
+            project::File::from_dyn(buffer.read(cx).file()).map(|file| file.abs_path(cx))
+        });
+        workspace.publish_context_event(
+            ContextSource::Editor,
+            ContextEvent::FileOpened {
+                path: file_path
+                    .as_ref()
+                    .map(|path| path.as_os_str().to_string_lossy().into_owned()),
+                language: None,
+                line_count: None,
+            },
+            cx,
+        );
         if let Some(workspace_entity) = &workspace.weak_handle().upgrade() {
             cx.subscribe(
                 workspace_entity,
@@ -1019,9 +1034,7 @@ impl Item for Editor {
 
         if !has_folds {
             if let Some(workspace_id) = workspace.database_id()
-                && let Some(file_path) = self.buffer().read(cx).as_singleton().and_then(|buffer| {
-                    project::File::from_dyn(buffer.read(cx).file()).map(|file| file.abs_path(cx))
-                })
+                && let Some(file_path) = file_path
             {
                 self.load_folds_from_db(workspace_id, file_path, window, cx);
             }
@@ -2051,8 +2064,9 @@ fn restore_serialized_buffer_contents(
 #[cfg(test)]
 mod tests {
     use crate::editor_tests::init_test;
+    use context_bus::{ContextEvent, ContextSource};
     use fs::Fs;
-    use workspace::MultiWorkspace;
+    use workspace::{MultiWorkspace, OpenOptions};
 
     use super::*;
     use fs::MTime;
@@ -2071,6 +2085,46 @@ mod tests {
             local_root: None,
         });
         assert_eq!(path_for_file(&file, 0, false, cx), None);
+    }
+
+    #[gpui::test]
+    async fn test_open_abs_path_publishes_file_opened_context_event(cx: &mut gpui::TestAppContext) {
+        init_test(cx, |_| {});
+
+        let fs = FakeFs::new(cx.executor());
+        fs.insert_tree(path!("/root"), json!({ "file.rs": "fn main() {}\n" }))
+            .await;
+
+        let project = Project::test(fs.clone(), [Path::new(path!("/root"))], cx).await;
+        let window_handle =
+            cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
+        let workspace = window_handle
+            .read_with(cx, |mw, _| mw.workspace().clone())
+            .unwrap();
+        let cx = &mut VisualTestContext::from_window(window_handle.into(), cx);
+
+        workspace
+            .update_in(cx, |workspace, window, cx| {
+                workspace.open_abs_path(
+                    PathBuf::from(path!("/root/file.rs")),
+                    OpenOptions::default(),
+                    window,
+                    cx,
+                )
+            })
+            .await
+            .unwrap();
+        cx.run_until_parked();
+
+        let events = workspace.read_with(cx, |workspace, cx| workspace.replay_context_events(cx));
+        assert!(events.iter().any(|event| {
+            event.metadata.source == ContextSource::Editor
+                && matches!(
+                    &event.event,
+                    ContextEvent::FileOpened { path: Some(path) }
+                        if path == path!("/root/file.rs")
+                )
+        }));
     }
 
     async fn deserialize_editor(

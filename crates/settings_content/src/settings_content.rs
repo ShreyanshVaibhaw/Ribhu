@@ -178,12 +178,12 @@ pub struct SettingsContent {
 
     pub proxy: Option<String>,
 
-    /// The URL of the Zed server to connect to.
+    /// The URL of the Ribhu server to connect to.
     pub server_url: Option<String>,
 
     /// Configuration for session-related features
     pub session: Option<SessionSettingsContent>,
-    /// Control what info is collected by Zed.
+    /// Control what info is collected by Ribhu.
     pub telemetry: Option<TelemetrySettingsContent>,
 
     /// Configuration of the terminal in Zed.

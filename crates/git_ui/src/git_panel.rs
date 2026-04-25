@@ -13,6 +13,7 @@ use agent_settings::AgentSettings;
 use anyhow::Context as _;
 use askpass::AskPassDelegate;
 use collections::{BTreeMap, HashMap, HashSet};
+use context_bus::{ContextEvent, ContextSource};
 use db::kvp::KeyValueStore;
 use editor::{
     Direction, Editor, EditorElement, EditorMode, MultiBuffer, MultiBufferOffset,
@@ -796,7 +797,41 @@ impl GitPanel {
                             .ok();
                     }
                     GitStoreEvent::RepositoryUpdated(_, _, _) => {}
-                    GitStoreEvent::JobsUpdated | GitStoreEvent::ConflictsUpdated => {}
+                    GitStoreEvent::JobsUpdated => {}
+                    GitStoreEvent::ConflictsUpdated => {
+                        // Collect conflicted file paths and publish ConflictFound.
+                        let conflict_files: Vec<String> = this
+                            .entries
+                            .iter()
+                            .filter_map(|entry| entry.status_entry())
+                            .filter(|entry| {
+                                this.active_repository
+                                    .as_ref()
+                                    .map(|repo| {
+                                        repo.read(cx)
+                                            .had_conflict_on_last_merge_head_change(
+                                                &entry.repo_path,
+                                            )
+                                    })
+                                    .unwrap_or(false)
+                            })
+                            .map(|entry| entry.repo_path.as_std_path().to_string_lossy().into_owned())
+                            .collect();
+
+                        if !conflict_files.is_empty() {
+                            if let Some(workspace) = this.workspace.upgrade() {
+                                let _ = workspace.update(cx, |workspace, cx| {
+                                    workspace.publish_context_event(
+                                        ContextSource::Git,
+                                        ContextEvent::ConflictFound {
+                                            files: conflict_files,
+                                        },
+                                        cx,
+                                    );
+                                });
+                            }
+                        }
+                    }
                 },
             )
             .detach();
@@ -842,6 +877,24 @@ impl GitPanel {
                 stash_entries: Default::default(),
                 _settings_subscription,
             };
+
+            // Subscribe to Context Bus: log file saves from the editor.
+            // The git panel already auto-refreshes via filesystem watching;
+            // this subscription establishes the cross-panel pattern for Phase 2.
+            let context_bus = workspace.context_bus();
+            cx.subscribe(&context_bus, |_this, _, event: &context_bus::ContextEventEnvelope, _cx| {
+                match &event.event {
+                    ContextEvent::FileSaved { path, .. } => {
+                        log::debug!(
+                            target: "ribhu::context_bus",
+                            "[Git] noticed file saved: {}",
+                            path.as_deref().unwrap_or("unknown")
+                        );
+                    }
+                    _ => {}
+                }
+            })
+            .detach();
 
             this.schedule_update(window, cx);
             this
@@ -2331,6 +2384,12 @@ impl GitPanel {
         if self.add_coauthors {
             self.fill_co_authors(&mut message, cx);
         }
+        let commit_summary = message
+            .lines()
+            .map(str::trim)
+            .find(|line| !line.is_empty())
+            .map(ToOwned::to_owned);
+        let head_details_repo = active_repository.clone();
 
         let task = if self.has_staged_changes() {
             // Repository serializes all git operations, so we can just send a commit immediately
@@ -2364,6 +2423,17 @@ impl GitPanel {
         };
         let task = cx.spawn_in(window, async move |this, cx| {
             let result = task.await;
+            let commit_details = if result.is_ok() {
+                head_details_repo
+                    .update(cx, |repo, cx| {
+                        let show = repo.show("HEAD".to_string());
+                        cx.spawn(async move |_, _| show.await?)
+                    })
+                    .await
+                    .ok()
+            } else {
+                None
+            };
             this.update_in(cx, |this, window, cx| {
                 this.pending_commit.take();
 
@@ -2375,6 +2445,21 @@ impl GitPanel {
                             this.commit_editor
                                 .update(cx, |editor, cx| editor.clear(window, cx));
                             this.original_commit_message = None;
+                        }
+                        if let Some(workspace) = this.workspace.upgrade() {
+                            let _ = workspace.update(cx, |workspace, cx| {
+                                workspace.publish_context_event(
+                                    ContextSource::Git,
+                                    ContextEvent::CommitMade {
+                                        sha: commit_details
+                                            .as_ref()
+                                            .map(|details| details.sha.to_string())
+                                            .unwrap_or_else(|| "HEAD".to_string()),
+                                        summary: commit_summary.clone(),
+                                    },
+                                    cx,
+                                );
+                            });
                         }
                     }
                     Err(e) => this.show_error_toast("commit", e, cx),
@@ -6468,6 +6553,7 @@ fn format_git_error_toast_message(error: &anyhow::Error) -> String {
 
 #[cfg(test)]
 mod tests {
+    use context_bus::{ContextEvent, ContextSource};
     use git::{
         repository::repo_path,
         status::{StatusCode, UnmergedStatus, UnmergedStatusCode},
@@ -7257,6 +7343,72 @@ mod tests {
             );
             assert!(panel.original_commit_message.is_none());
         });
+    }
+
+    #[gpui::test]
+    async fn test_commit_publishes_context_event(cx: &mut TestAppContext) {
+        init_test(cx);
+        let fs = FakeFs::new(cx.background_executor.clone());
+        fs.insert_tree(
+            "/root",
+            json!({
+                "project": {
+                    ".git": {},
+                    "src": {
+                        "main.rs": "fn main() {}"
+                    }
+                }
+            }),
+        )
+        .await;
+
+        fs.set_status_for_repo(
+            Path::new(path!("/root/project/.git")),
+            &[("src/main.rs", StatusCode::Modified.worktree())],
+        );
+
+        let project = Project::test(fs.clone(), [Path::new(path!("/root/project"))], cx).await;
+        let window_handle =
+            cx.add_window(|window, cx| MultiWorkspace::test_new(project.clone(), window, cx));
+        let workspace = window_handle
+            .read_with(cx, |mw, _| mw.workspace().clone())
+            .unwrap();
+        let cx = &mut VisualTestContext::from_window(window_handle.into(), cx);
+
+        cx.executor().run_until_parked();
+
+        let panel = workspace.update_in(cx, GitPanel::new);
+        let handle = cx.update_window_entity(&panel, |panel, _, _| {
+            std::mem::replace(&mut panel.update_visible_entries_task, Task::ready(()))
+        });
+        cx.executor().advance_clock(2 * UPDATE_DEBOUNCE);
+        handle.await;
+
+        panel.update_in(cx, |panel, window, cx| {
+            panel.commit_message_buffer(cx).update(cx, |buffer, cx| {
+                buffer.set_text("feat: context bus commit event", cx);
+            });
+            panel.commit_changes(
+                CommitOptions {
+                    amend: false,
+                    signoff: false,
+                },
+                window,
+                cx,
+            );
+        });
+        cx.run_until_parked();
+
+        let events = workspace.read_with(cx, |workspace, cx| workspace.replay_context_events(cx));
+        assert!(events.iter().any(|event| {
+            event.metadata.source == ContextSource::Git
+                && matches!(
+                    &event.event,
+                    ContextEvent::CommitMade { sha, summary }
+                        if sha == "HEAD"
+                            && summary.as_deref() == Some("feat: context bus commit event")
+                )
+        }));
     }
 
     #[gpui::test]

@@ -76,7 +76,12 @@ use std::{
     sync::Arc,
     sync::atomic::{self, AtomicBool},
 };
+use api_client_panel::ApiClientPanel;
+use cloud_connect::CloudConnectPanel;
+use database_panel::DatabasePanel;
+use resource_monitor::ResourceMonitorPanel;
 use terminal_view::terminal_panel::{self, TerminalPanel};
+use test_runner_panel::TestRunnerPanel;
 use theme::{ActiveTheme, GlobalTheme, SystemAppearance, ThemeRegistry, ThemeSettings};
 use ui::{PopoverMenuHandle, prelude::*};
 use util::markdown::MarkdownString;
@@ -664,6 +669,11 @@ fn initialize_panels(
             cx.clone(),
         );
         let debug_panel = DebugPanel::load(workspace_handle.clone(), cx);
+        let test_runner_panel = TestRunnerPanel::load(workspace_handle.clone(), cx.clone());
+        let api_client_panel = ApiClientPanel::load(workspace_handle.clone(), cx.clone());
+        let database_panel = DatabasePanel::load(workspace_handle.clone(), cx.clone());
+        let cloud_connect_panel = CloudConnectPanel::load(workspace_handle.clone(), cx.clone());
+        let resource_monitor_panel = ResourceMonitorPanel::load(workspace_handle.clone(), cx.clone());
 
         async fn add_panel_when_ready(
             panel_task: impl Future<Output = anyhow::Result<Entity<impl workspace::Panel>>> + 'static,
@@ -688,6 +698,11 @@ fn initialize_panels(
             add_panel_when_ready(channels_panel, workspace_handle.clone(), cx.clone()),
             add_panel_when_ready(notification_panel, workspace_handle.clone(), cx.clone()),
             add_panel_when_ready(debug_panel, workspace_handle.clone(), cx.clone()),
+            add_panel_when_ready(test_runner_panel, workspace_handle.clone(), cx.clone()),
+            add_panel_when_ready(api_client_panel, workspace_handle.clone(), cx.clone()),
+            add_panel_when_ready(database_panel, workspace_handle.clone(), cx.clone()),
+            add_panel_when_ready(cloud_connect_panel, workspace_handle.clone(), cx.clone()),
+            add_panel_when_ready(resource_monitor_panel, workspace_handle.clone(), cx.clone()),
             initialize_agent_panel(workspace_handle, prompt_builder, cx.clone()).map(|r| r.log_err()),
         );
 
@@ -5026,6 +5041,11 @@ mod tests {
             project_panel::init(cx);
             outline_panel::init(cx);
             terminal_view::init(cx);
+            test_runner_panel::init(cx);
+            api_client_panel::init(cx);
+            database_panel::init(cx);
+            cloud_connect::init(cx);
+            resource_monitor::init(cx);
             copilot_chat::init(
                 app_state.fs.clone(),
                 app_state.client.http_client(),

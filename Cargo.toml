@@ -196,6 +196,7 @@ members = [
     "crates/terminal",
     "crates/terminal_view",
     "crates/test_runner",
+    "crates/test_runner_panel",
     "crates/text",
     "crates/theme",
     "crates/theme_extension",
@@ -223,7 +224,10 @@ members = [
     "crates/x_ai",
     "crates/ai_conductor",
     "crates/api_client",
+    "crates/api_client_panel",
+    "crates/cloud_connect",
     "crates/database_panel",
+    "crates/resource_monitor",
     "crates/zed",
     "crates/zed_actions",
     "crates/zed_env_vars",
@@ -266,6 +270,7 @@ acp_tools = { path = "crates/acp_tools" }
 acp_thread = { path = "crates/acp_thread" }
 action_log = { path = "crates/action_log" }
 agent = { path = "crates/agent" }
+ai_conductor = { path = "crates/ai_conductor" }
 activity_indicator = { path = "crates/activity_indicator" }
 agent_ui = { path = "crates/agent_ui" }
 agent_settings = { path = "crates/agent_settings" }
@@ -283,7 +288,10 @@ auto_update_ui = { path = "crates/auto_update_ui" }
 aws_http_client = { path = "crates/aws_http_client" }
 bedrock = { path = "crates/bedrock" }
 breadcrumbs = { path = "crates/breadcrumbs" }
+api_client = { path = "crates/api_client" }
+api_client_panel = { path = "crates/api_client_panel" }
 buffer_diff = { path = "crates/buffer_diff" }
+cloud_connect = { path = "crates/cloud_connect" }
 call = { path = "crates/call" }
 channel = { path = "crates/channel" }
 cli = { path = "crates/cli" }
@@ -299,6 +307,7 @@ command_palette = { path = "crates/command_palette" }
 command_palette_hooks = { path = "crates/command_palette_hooks" }
 component = { path = "crates/component" }
 component_preview = { path = "crates/component_preview" }
+context_bus = { path = "crates/context_bus" }
 context_server = { path = "crates/context_server" }
 copilot = { path = "crates/copilot" }
 copilot_chat = { path = "crates/copilot_chat" }
@@ -309,6 +318,7 @@ crossbeam = "0.8.4"
 csv_preview = { path = "crates/csv_preview"}
 dap = { path = "crates/dap" }
 dap_adapters = { path = "crates/dap_adapters" }
+database_panel = { path = "crates/database_panel" }
 db = { path = "crates/db" }
 debug_adapter_extension = { path = "crates/debug_adapter_extension" }
 debugger_tools = { path = "crates/debugger_tools" }
@@ -402,6 +412,7 @@ prettier = { path = "crates/prettier" }
 settings_profile_selector = { path = "crates/settings_profile_selector" }
 project = { path = "crates/project" }
 project_panel = { path = "crates/project_panel" }
+project_profiles = { path = "crates/project_profiles" }
 project_symbols = { path = "crates/project_symbols" }
 prompt_store = { path = "crates/prompt_store" }
 proto = { path = "crates/proto" }
@@ -413,6 +424,7 @@ remote_connection = { path = "crates/remote_connection" }
 remote_server = { path = "crates/remote_server" }
 repl = { path = "crates/repl" }
 reqwest_client = { path = "crates/reqwest_client" }
+resource_monitor = { path = "crates/resource_monitor" }
 rodio = { git = "https://github.com/RustAudio/rodio", rev = "e50e726ddd0292f6ef9de0dda6b90af4ed1fb66a", features = ["wav", "playback", "wav_output", "recording"] }
 rope = { path = "crates/rope" }
 rpc = { path = "crates/rpc" }
@@ -444,6 +456,8 @@ telemetry = { path = "crates/telemetry" }
 telemetry_events = { path = "crates/telemetry_events" }
 terminal = { path = "crates/terminal" }
 terminal_view = { path = "crates/terminal_view" }
+test_runner = { path = "crates/test_runner" }
+test_runner_panel = { path = "crates/test_runner_panel" }
 text = { path = "crates/text" }
 theme = { path = "crates/theme" }
 theme_extension = { path = "crates/theme_extension" }

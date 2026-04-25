@@ -79,8 +79,8 @@ jobs:
           name: ribhu-ubuntu-latest-release
           if-no-files-found: warn
           path: |
-            target/release/zed
-            target/release/zed.exe
+            target/release/ribhu
+            target/release/ribhu.exe
 
   validate-macos:
     name: macos-latest
@@ -139,8 +139,8 @@ jobs:
           name: ribhu-macos-latest-release
           if-no-files-found: warn
           path: |
-            target/release/zed
-            target/release/zed.exe
+            target/release/ribhu
+            target/release/ribhu.exe
 
   validate-windows:
     name: windows-latest
@@ -209,5 +209,5 @@ jobs:
           name: ribhu-windows-latest-release
           if-no-files-found: warn
           path: |
-            target/release/zed
-            target/release/zed.exe
+            target/release/ribhu
+            target/release/ribhu.exe

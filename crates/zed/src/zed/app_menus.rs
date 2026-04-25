@@ -305,9 +305,9 @@ pub fn app_menus(cx: &mut App) -> Vec<Menu> {
                 ),
                 MenuItem::separator(),
                 MenuItem::action(
-                    "Upstream Documentation",
+                    "Documentation",
                     super::OpenBrowser {
-                        url: "https://zed.dev/docs".into(),
+                        url: "https://github.com/ShreyanshVaibhaw/zed/wiki".into(),
                     },
                 ),
                 MenuItem::action(

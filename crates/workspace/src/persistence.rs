@@ -971,6 +971,25 @@ impl Domain for WorkspaceDb {
         sql!(
             ALTER TABLE remote_connections ADD COLUMN use_podman BOOLEAN;
         ),
+        // ── Ribhu Phase 3: Project Profiles ─────────────────────────────────────
+        sql!(
+            CREATE TABLE IF NOT EXISTS ribhu_projects(
+                id TEXT PRIMARY KEY NOT NULL,
+                name TEXT NOT NULL,
+                path TEXT NOT NULL UNIQUE,
+                last_opened INTEGER NOT NULL DEFAULT 0,
+                created_at INTEGER NOT NULL DEFAULT 0
+            ) STRICT;
+
+            CREATE TABLE IF NOT EXISTS ribhu_profile_states(
+                project_id TEXT NOT NULL,
+                category TEXT NOT NULL,
+                state_json TEXT NOT NULL,
+                updated_at INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (project_id, category),
+                FOREIGN KEY(project_id) REFERENCES ribhu_projects(id) ON DELETE CASCADE
+            ) STRICT;
+        ),
     ];
 
     // Allow recovering from bad migration that was initially shipped to nightly
@@ -2358,6 +2377,143 @@ VALUES {placeholders};"#
         }
     }
 }
+
+// ── Ribhu Phase 3: Project Profile DB Methods ────────────────────────────────
+
+/// Lightweight record returned by `list_ribhu_projects`.
+#[derive(Debug, Clone)]
+pub struct RibhuProjectInfo {
+    pub id: String,
+    pub name: String,
+    pub path: String,
+    pub last_opened: i64,
+}
+
+impl WorkspaceDb {
+    /// Insert or update a project record. Returns the project id.
+    pub async fn get_or_create_ribhu_project(&self, path: &str) -> Result<String> {
+        let path = path.to_string();
+        let path_clone = path.clone();
+        let existing: Option<String> = self
+            .write(move |conn| {
+                conn.select_row_bound::<String, String>(
+                    "SELECT id FROM ribhu_projects WHERE path = ?",
+                )?(path_clone)
+            })
+            .await?;
+        if let Some(id) = existing {
+            return Ok(id);
+        }
+        let id = uuid::Uuid::new_v4().to_string();
+        let name = std::path::Path::new(&path)
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| path.clone());
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs() as i64;
+        let id_clone = id.clone();
+        self.write(move |conn| {
+            conn.exec_bound::<(&str, &str, &str, i64, i64)>(
+                "INSERT OR IGNORE INTO ribhu_projects (id, name, path, last_opened, created_at) VALUES (?, ?, ?, ?, ?)",
+            )?((&id_clone, name.as_str(), path.as_str(), now, now))
+        })
+        .await?;
+        Ok(id)
+    }
+
+    /// Update last_opened timestamp for a project.
+    pub async fn touch_ribhu_project(&self, project_id: &str) -> Result<()> {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs() as i64;
+        let pid = project_id.to_string();
+        self.write(move |conn| {
+            conn.exec_bound::<(i64, &str)>(
+                "UPDATE ribhu_projects SET last_opened = ? WHERE id = ?",
+            )?((now, pid.as_str()))
+        })
+        .await?;
+        Ok(())
+    }
+
+    /// Return all projects sorted by last_opened descending.
+    pub async fn list_ribhu_projects(&self) -> Result<Vec<RibhuProjectInfo>> {
+        self.write(|conn| {
+            conn.select::<(String, String, String, i64)>(
+                "SELECT id, name, path, last_opened FROM ribhu_projects ORDER BY last_opened DESC",
+            )?()
+        })
+        .await
+        .map(|rows| {
+            rows.into_iter()
+                .map(|(id, name, path, last_opened)| RibhuProjectInfo {
+                    id,
+                    name,
+                    path,
+                    last_opened,
+                })
+                .collect()
+        })
+    }
+
+    /// Save a JSON blob for a project state category.
+    pub async fn save_ribhu_profile(
+        &self,
+        project_id: &str,
+        category: &str,
+        state_json: &str,
+    ) -> Result<()> {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs() as i64;
+        let pid = project_id.to_string();
+        let cat = category.to_string();
+        let json = state_json.to_string();
+        self.write(move |conn| {
+            conn.exec_bound::<(&str, &str, &str, i64)>(
+                "INSERT INTO ribhu_profile_states (project_id, category, state_json, updated_at) \
+                 VALUES (?, ?, ?, ?) \
+                 ON CONFLICT(project_id, category) DO UPDATE SET state_json = excluded.state_json, updated_at = excluded.updated_at",
+            )?((&pid, &cat, &json, now))
+        })
+        .await?;
+        Ok(())
+    }
+
+    /// Load a JSON blob for a project state category. Returns None if not found.
+    pub async fn load_ribhu_profile(
+        &self,
+        project_id: &str,
+        category: &str,
+    ) -> Result<Option<String>> {
+        let pid = project_id.to_string();
+        let cat = category.to_string();
+        self.write(move |conn| {
+            conn.select_row_bound::<(&str, &str), String>(
+                "SELECT state_json FROM ribhu_profile_states WHERE project_id = ? AND category = ?",
+            )?((&pid, &cat))
+        })
+        .await
+    }
+
+    /// Delete a project and all its profile states (cascades via FK).
+    pub async fn delete_ribhu_project(&self, project_id: &str) -> Result<()> {
+        let pid = project_id.to_string();
+        self.write(move |conn| {
+            conn.exec_bound::<&str>(
+                "DELETE FROM ribhu_projects WHERE id = ?",
+            )?(pid.as_str())
+        })
+        .await?;
+        Ok(())
+    }
+}
+
+// ── End Ribhu Phase 3 ─────────────────────────────────────────────────────────
 
 type WorkspaceEntry = (
     WorkspaceId,

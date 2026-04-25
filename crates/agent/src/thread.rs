@@ -971,6 +971,8 @@ pub struct Thread {
     ui_scroll_position: Option<gpui::ListOffset>,
     /// Weak references to running subagent threads for cancellation propagation
     running_subagents: Vec<WeakEntity<Thread>>,
+    /// Ribhu workspace context assembled by AiConductor; prepended to the system prompt.
+    ribhu_context: Option<String>,
 }
 
 impl Thread {
@@ -1086,11 +1088,18 @@ impl Thread {
             draft_prompt: None,
             ui_scroll_position: None,
             running_subagents: Vec::new(),
+            ribhu_context: None,
         }
     }
 
     pub fn id(&self) -> &acp::SessionId {
         &self.id
+    }
+
+    /// Update the Ribhu workspace context that is prepended to every system prompt.
+    /// Called by AiConductor whenever a `ConductorEvent::ContextUpdated` is emitted.
+    pub fn set_ribhu_context(&mut self, context: String) {
+        self.ribhu_context = Some(context);
     }
 
     /// Returns true if this thread was imported from a shared thread.
@@ -1305,6 +1314,7 @@ impl Thread {
                 offset_in_item: gpui::px(sp.offset_in_item),
             }),
             running_subagents: Vec::new(),
+            ribhu_context: None,
         }
     }
 
@@ -2923,7 +2933,7 @@ impl Thread {
             self.messages.len()
         );
 
-        let system_prompt = SystemPromptTemplate {
+        let mut system_prompt = SystemPromptTemplate {
             project: self.project_context.read(cx),
             available_tools,
             model_name: self.model.as_ref().map(|m| m.name().0.to_string()),
@@ -2931,6 +2941,10 @@ impl Thread {
         .render(&self.templates)
         .context("failed to build system prompt")
         .expect("Invalid template");
+        // Prepend Ribhu workspace context assembled by AiConductor (if available).
+        if let Some(ref ctx) = self.ribhu_context {
+            system_prompt = format!("{}\n\n{}", ctx, system_prompt);
+        }
         let mut messages = vec![LanguageModelRequestMessage {
             role: Role::System,
             content: vec![system_prompt.into()],

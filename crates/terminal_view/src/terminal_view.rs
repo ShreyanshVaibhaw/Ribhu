@@ -6,6 +6,7 @@ pub mod terminal_scrollbar;
 mod terminal_slash_command;
 
 use assistant_slash_command::SlashCommandRegistry;
+use context_bus::{ContextEvent, ContextSource};
 use editor::{Editor, EditorSettings, actions::SelectAll, blink_manager::BlinkManager};
 use gpui::{
     Action, AnyElement, App, ClipboardEntry, DismissEvent, Entity, EventEmitter, ExternalPaths,
@@ -262,12 +263,31 @@ impl TerminalView {
             )
         });
 
-        let subscriptions = vec![
+        let mut subscriptions = vec![
             focus_in,
             focus_out,
             cx.observe(&blink_manager, |_, _, cx| cx.notify()),
             cx.observe_global::<SettingsStore>(Self::settings_changed),
         ];
+
+        // Subscribe to Context Bus events for cross-panel awareness.
+        if let Some(workspace_entity) = workspace_handle.upgrade() {
+            let context_bus = workspace_entity.read(cx).context_bus();
+            subscriptions.push(cx.subscribe(
+                &context_bus,
+                |_this, _, event: &context_bus::ContextEventEnvelope, _cx| {
+                    match &event.event {
+                        ContextEvent::BranchChanged { branch } => {
+                            log::debug!(
+                                target: "ribhu::context_bus",
+                                "[Terminal] noticed branch switch to {branch}"
+                            );
+                        }
+                        _ => {}
+                    }
+                },
+            ));
+        }
 
         Self {
             terminal,
@@ -1033,6 +1053,48 @@ fn subscribe_for_terminal_events(
 
                 Event::TitleChanged => {
                     cx.emit(ItemEvent::UpdateTab);
+                }
+
+                Event::TaskFinished {
+                    task_label: _,
+                    command,
+                    summary,
+                    exit_code,
+                    success,
+                } => {
+                    if let Some(workspace) = workspace.upgrade() {
+                        let command = Some(command.clone());
+                        let summary = summary.clone();
+                        let exit_code = *exit_code;
+                        let success = *success;
+                        let _ = workspace.update(cx, |workspace, cx| {
+                            workspace.publish_context_event(
+                                ContextSource::Terminal,
+                                ContextEvent::CmdExecuted {
+                                    command: command.clone(),
+                                    exit_code,
+                                    summary: summary.clone(),
+                                },
+                                cx,
+                            );
+
+                            if !success {
+                                workspace.publish_context_event(
+                                    ContextSource::Terminal,
+                                    ContextEvent::ErrorDetected {
+                                        message: summary,
+                                        file_path: None,
+                                        line: None,
+                                        column: None,
+                                        severity: context_bus::ErrorSeverity::Error,
+                                        command,
+                                        exit_code,
+                                    },
+                                    cx,
+                                );
+                            }
+                        });
+                    }
                 }
 
                 Event::NewNavigationTarget(maybe_navigation_target) => {

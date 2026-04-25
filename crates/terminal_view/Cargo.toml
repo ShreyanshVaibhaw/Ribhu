@@ -21,6 +21,7 @@ async-recursion.workspace = true
 assistant_slash_command.workspace = true
 breadcrumbs.workspace = true
 collections.workspace = true
+context_bus.workspace = true
 db.workspace = true
 dirs.workspace = true
 editor.workspace = true

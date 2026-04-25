@@ -87,7 +87,7 @@ pub const INITIAL_RECONNECTION_DELAY: Duration = Duration::from_millis(500);
 pub const MAX_RECONNECTION_DELAY: Duration = Duration::from_secs(30);
 pub const CONNECTION_TIMEOUT: Duration = Duration::from_secs(20);
 
-/// Ribhu Phase 0 runs without a required runtime dependency on Zed-hosted cloud services.
+/// Ribhu Phase 0 runs without a required runtime dependency on Ribhu-hosted cloud services.
 pub fn cloud_features_enabled() -> bool {
     *RIBHU_ENABLE_ZED_CLOUD
 }
@@ -95,9 +95,9 @@ pub fn cloud_features_enabled() -> bool {
 actions!(
     client,
     [
-        /// Signs in to Zed account.
+        /// Signs in to Ribhu account.
         SignIn,
-        /// Signs out of Zed account.
+        /// Signs out of Ribhu account.
         SignOut,
         /// Reconnects to the collaboration server.
         Reconnect
